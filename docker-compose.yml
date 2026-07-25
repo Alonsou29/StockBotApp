@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fruteria_trebol_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trebol_user
+      POSTGRES_PASSWORD: trebol_pass
+      POSTGRES_DB: fruteria_trebol
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fruteria_trebol_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://trebol_user:trebol_pass@db:5432/fruteria_trebol
+      CORS_ORIGINS: "*"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:

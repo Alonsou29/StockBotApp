@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.env
+!*.env.example
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Database
+*.db
+*.sqlite3
+
+# Flutter
+frontend/*/build/
+frontend/*/.dart_tool/
+frontend/*/.flutter-plugins
+frontend/*/.flutter-plugins-dependencies
+frontend/*/.packages
+frontend/*/pubspec.lock
+
+# OS
+.DS_Store
+Thumbs.db

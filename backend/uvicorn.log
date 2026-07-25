@@ -1,0 +1,36 @@
+INFO:     Started server process [14610]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52896 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52900 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52901 - "PUT /daily-lists/1 HTTP/1.1" 200 OK
+INFO:     192.168.1.173:52916 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.1.175:57208 - "GET /daily-lists/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:57014 - "GET /products HTTP/1.1" 307 Temporary Redirect
+INFO:     192.168.1.175:57014 - "GET /products/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:57026 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:50142 - "PUT /daily-lists/1 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:47414 - "GET /daily-lists/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:59130 - "GET /daily-lists/2 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:59144 - "GET /daily-lists/2 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:40046 - "GET /products HTTP/1.1" 307 Temporary Redirect
+INFO:     192.168.1.175:40046 - "GET /products/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:40052 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:46618 - "PUT /daily-lists/1 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:34000 - "PUT /daily-lists/1 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:40680 - "PUT /daily-lists/1 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:47826 - "GET /products HTTP/1.1" 307 Temporary Redirect
+INFO:     192.168.1.175:47826 - "GET /products/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:47836 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:47838 - "PUT /daily-lists/1 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:52296 - "GET /products HTTP/1.1" 307 Temporary Redirect
+INFO:     192.168.1.175:52296 - "GET /products/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:52304 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:60158 - "GET /daily-lists/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:41902 - "GET /products HTTP/1.1" 307 Temporary Redirect
+INFO:     192.168.1.175:41902 - "GET /products/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:41910 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     192.168.1.175:55398 - "GET /products HTTP/1.1" 307 Temporary Redirect
+INFO:     192.168.1.175:55398 - "GET /products/ HTTP/1.1" 200 OK
+INFO:     192.168.1.175:55412 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
