@@ -34,3 +34,4 @@ INFO:     192.168.1.175:41910 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 2
 INFO:     192.168.1.175:55398 - "GET /products HTTP/1.1" 307 Temporary Redirect
 INFO:     192.168.1.175:55398 - "GET /products/ HTTP/1.1" 200 OK
 INFO:     192.168.1.175:55412 - "GET /daily-lists/by-date/2026-07-24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53584 - "GET /health HTTP/1.1" 200 OK

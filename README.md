@@ -23,6 +23,8 @@ fruteria_trebol_app/
 
 Asegurate de tener Docker y Docker Compose instalados.
 
+La app se conecta a una base de datos PostgreSQL existente en la red `postgresql_odoo-net` (contenedor `odoo_postgres`, base de datos `trebol_db`).
+
 ```bash
 cd fruteria_trebol_app
 docker-compose up --build
@@ -30,7 +32,6 @@ docker-compose up --build
 
 Esto levanta:
 
-- PostgreSQL en `localhost:5432`
 - Backend FastAPI en `http://localhost:8000`
 
 La documentación de la API está en `http://localhost:8000/docs`.
