@@ -7,7 +7,7 @@ class ApiService {
   // Ajusta esta URL segun donde corra el backend.
   // En emulador Android usa: http://10.0.2.2:8000
   // En iOS simulador/dispositivo fisico usa la IP de tu computadora.
-  static const String baseUrl = 'http://192.168.1.173:8000';
+  static const String baseUrl = 'http://192.168.1.5:8000';
 
   static Future<List<Product>> fetchProducts({String? category}) async {
     final uri = Uri.parse(baseUrl + '/products').replace(
