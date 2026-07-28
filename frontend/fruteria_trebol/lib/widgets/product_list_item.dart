@@ -81,7 +81,6 @@ class _ProductListItemState extends State<ProductListItem> {
               Row(
                 children: [
                   Expanded(
-                    flex: 3,
                     child: TextField(
                       controller: _hayController,
                       focusNode: _hayFocus,
@@ -97,7 +96,6 @@ class _ProductListItemState extends State<ProductListItem> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    flex: 3,
                     child: TextField(
                       controller: _quantityController,
                       focusNode: _quantityFocus,
@@ -111,26 +109,28 @@ class _ProductListItemState extends State<ProductListItem> {
                       onChanged: (_) => _notifyChange(),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: DropdownButtonFormField<String>(
-                      value: _actions.contains(widget.item.action) ? widget.item.action : 'NO',
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _actions
-                          .map((a) => DropdownMenuItem(value: a, child: Text(a, style: const TextStyle(fontSize: 12))))
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          _notifyChange(action: value);
-                        }
-                      },
-                    ),
-                  ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: _actions.contains(widget.item.action) ? widget.item.action : 'NO',
+                  decoration: const InputDecoration(
+                    labelText: 'Accion',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _actions
+                      .map((a) => DropdownMenuItem(value: a, child: Text(a, style: const TextStyle(fontSize: 12))))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      _notifyChange(action: value);
+                    }
+                  },
+                ),
               ),
             ],
           ),

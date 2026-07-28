@@ -1,0 +1,115 @@
+// Orden de impresión basado en la plantilla ANTIBRUTO.xlsx.
+// Incluye solo productos, sin el campo de precio.
+
+const List<String> printOrder = [
+  // Verduras
+  'TOMATE',
+  'CEBOLLA',
+  'ZANAHORIA',
+  'PAPA',
+  'CEBOLLA M',
+  'PIMENTON R',
+  'PIMENTON V',
+  'AMERICANA',
+  'ROMANA',
+  'BERENGENA',
+  'APIO',
+  'REMOLACHA',
+  'AGUACATE',
+  'PEPINO',
+  'AJI DULCE',
+  'AJI MARGA',
+  'PLATANOS 1',
+  'PLATANOS 2',
+  'PLATANOS 3',
+  'TOPOCHO',
+  'YUCA',
+  'AUYAMA',
+  'AUY ENANA',
+  'REPOLLO M',
+  'REPOLLO B',
+  'JOJOTO',
+  'PAPITA COL',
+  'OCUMO',
+  'ÑAME',
+  'BATATA BLA',
+  'BATATA RO',
+  'OCUMITO',
+  'BROCOLI',
+  'COLIFLOR',
+  'GENGIBRE',
+  'CURCUMA',
+  'PINGA DE PE',
+  'MONGOL',
+  'VAINITA',
+  'NABO',
+  'CALABACIN',
+  'AJO',
+  'CEBOLLIN',
+  'CILANTRO',
+  'PORRO',
+  'ACELGA',
+  'ESPINACA',
+  'CEDANO',
+  'PEREJIL',
+
+  // Frutas
+  'PERA',
+  'ROJA GRAN',
+  'ROJA PEQ',
+  'GALA GRAN',
+  'VERDE GRAN',
+  'VERDE PEQ',
+  'ARANDANOS',
+  'CIRUELA CRI',
+  'CIRUELA IMP',
+  'FRESAS',
+  'MANGO',
+  'GUANABANA',
+  'NARANJA',
+  'NARANJA IM',
+  'UVA CRIOLLA',
+  'UVA IMPOR',
+  'PARCHITA',
+  'GUAYABA',
+  'MELON',
+  'LECHOSA',
+  'TOMATE DE ARBOL',
+  'CAMBUR CRIOLLO',
+  'CAMBUR MANZANO',
+  'CAMBUR BANANO',
+  'BOROJO',
+  'TAMARINDO CHINO',
+  'COCO',
+  'DURAZNO G',
+  'DURAZNO P',
+  'MAMON',
+  'PATILLA',
+  'PIÑA GRAND',
+  'PIÑA MEDIA',
+  'PIÑA PEQUE',
+  'KIWI',
+  'MORA',
+  'MANDARINA',
+  'MANDARINA IMPORTADA',
+  'TAMARINDO',
+  'PANELA',
+  'MIEL',
+  'MEREY',
+  'LIMON',
+];
+
+int compareByPrintOrder(String nameA, String nameB) {
+  final indexA = printOrder.indexOf(displayProductName(nameA));
+  final indexB = printOrder.indexOf(displayProductName(nameB));
+  if (indexA == -1 && indexB == -1) return nameA.compareTo(nameB);
+  if (indexA == -1) return 1;
+  if (indexB == -1) return -1;
+  return indexA.compareTo(indexB);
+}
+
+const Map<String, String> displayName = {
+  'PERIJIL': 'PEREJIL',
+};
+
+String displayProductName(String name) => displayName[name] ?? name;

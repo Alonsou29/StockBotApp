@@ -47,7 +47,7 @@ VERDURAS = [
     "ACELGA",
     "ESPINACA",
     "CEDANO",
-    "PERIJIL",
+    "PEREJIL",
 ]
 
 FRUTAS = [

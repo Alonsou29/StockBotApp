@@ -7,7 +7,7 @@ class ApiService {
   // Ajusta esta URL segun donde corra el backend.
   // En emulador Android usa: http://10.0.2.2:8000
   // En iOS simulador/dispositivo fisico usa la IP de tu computadora.
-  static const String baseUrl = 'http://192.168.1.5:8000';
+  static const String baseUrl = 'https://stockbot.fruteriaeltrebol.com.ve';
 
   static Future<List<Product>> fetchProducts({String? category}) async {
     final uri = Uri.parse(baseUrl + '/products').replace(
@@ -19,6 +19,18 @@ class ApiService {
       return data.map((e) => Product.fromJson(e)).toList();
     }
     throw Exception('Error cargando productos: ${response.statusCode}');
+  }
+
+  static Future<Product> createProduct(String name, String category) async {
+    final response = await http.post(
+      Uri.parse(baseUrl + '/products'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'name': name, 'category': category}),
+    );
+    if (response.statusCode == 201) {
+      return Product.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Error creando producto: ${response.statusCode} ${response.body}');
   }
 
   static Future<List<DailyListSummary>> fetchDailyLists() async {
