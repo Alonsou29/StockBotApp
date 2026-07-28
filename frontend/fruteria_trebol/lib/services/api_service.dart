@@ -10,7 +10,7 @@ class ApiService {
   static const String baseUrl = 'https://stockbot.fruteriaeltrebol.com.ve';
 
   static Future<List<Product>> fetchProducts({String? category}) async {
-    final uri = Uri.parse(baseUrl + '/products').replace(
+    final uri = Uri.parse(baseUrl + '/products/').replace(
       queryParameters: category != null ? {'category': category} : null,
     );
     final response = await http.get(uri);
@@ -23,7 +23,7 @@ class ApiService {
 
   static Future<Product> createProduct(String name, String category) async {
     final response = await http.post(
-      Uri.parse(baseUrl + '/products'),
+      Uri.parse(baseUrl + '/products/'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'name': name, 'category': category}),
     );
