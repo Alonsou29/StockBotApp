@@ -1,5 +1,6 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:meta/meta.dart';
 import '../models/daily_list.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
@@ -14,8 +15,10 @@ class DailyListProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Product> get verduras => _products.where((p) => p.category == 'verdura').toList();
-  List<Product> get frutas => _products.where((p) => p.category == 'fruta').toList();
+  List<Product> get verduras =>
+      _products.where((p) => p.category == 'verdura').toList();
+  List<Product> get frutas =>
+      _products.where((p) => p.category == 'fruta').toList();
 
   DailyList? _currentList;
   DailyList? get currentList => _currentList;
@@ -23,14 +26,25 @@ class DailyListProvider extends ChangeNotifier {
   @visibleForTesting
   set currentList(DailyList? value) {
     _currentList = value;
+    if (value != null) {
+      _initialSnapshot = _snapshot(value);
+    }
     notifyListeners();
   }
+
+  String? _initialSnapshot;
+  bool get hasUnsavedChanges =>
+      _currentList != null &&
+      _initialSnapshot != null &&
+      _snapshot(_currentList!) != _initialSnapshot;
 
   bool _loading = false;
   bool get loading => _loading;
 
   String? _error;
   String? get error => _error;
+
+  String _snapshot(DailyList list) => jsonEncode(list.toJson());
 
   Future<void> loadProducts() async {
     _setLoading(true);
@@ -58,6 +72,7 @@ class DailyListProvider extends ChangeNotifier {
         // Asegurar que todos los productos activos aparezcan
         _currentList = _mergeWithAllProducts(_currentList!, date);
       }
+      _initialSnapshot = _snapshot(_currentList!);
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -86,12 +101,16 @@ class DailyListProvider extends ChangeNotifier {
     );
   }
 
-  void updateItem(int productId, {String? hay, String? action, String? quantityToBring}) {
+  void updateItem(int productId,
+      {String? hay, String? action, String? quantityToBring}) {
     if (_currentList == null) return;
-    final item = _currentList!.items.firstWhere((i) => i.productId == productId);
+    final item =
+        _currentList!.items.firstWhere((i) => i.productId == productId);
     if (hay != null) item.hay = hay;
     if (action != null) item.action = action;
-    if (quantityToBring != null) item.quantityToBring = quantityToBring.isEmpty ? null : quantityToBring;
+    if (quantityToBring != null) {
+      item.quantityToBring = quantityToBring.isEmpty ? null : quantityToBring;
+    }
     notifyListeners();
   }
 
@@ -102,9 +121,12 @@ class DailyListProvider extends ChangeNotifier {
       if (_currentList!.id == null) {
         _currentList = await ApiService.createDailyList(_currentList!);
       } else {
-        _currentList = await ApiService.updateDailyList(_currentList!.id!, _currentList!);
+        _currentList =
+            await ApiService.updateDailyList(_currentList!.id!, _currentList!);
       }
-      _currentList = _mergeWithAllProducts(_currentList!, _currentList!.listDate);
+      _currentList =
+          _mergeWithAllProducts(_currentList!, _currentList!.listDate);
+      _initialSnapshot = _snapshot(_currentList!);
       _error = null;
     } catch (e) {
       _error = e.toString();

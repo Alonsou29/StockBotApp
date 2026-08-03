@@ -14,6 +14,7 @@ class DailyListScreen extends StatefulWidget {
 
 class _DailyListScreenState extends State<DailyListScreen> {
   DateTime _selectedDate = DateTime.now();
+  bool _allowPop = false;
 
   @override
   void initState() {
@@ -54,7 +55,8 @@ class _DailyListScreenState extends State<DailyListScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => PrintShareScreen(dailyList: provider.currentList!),
+              builder: (_) =>
+                  PrintShareScreen(dailyList: provider.currentList!),
             ),
           );
         }
@@ -68,58 +70,97 @@ class _DailyListScreenState extends State<DailyListScreen> {
     }
   }
 
+  Future<bool> _confirmDiscard() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Salir sin guardar?'),
+        content: const Text(
+            'Tienes cambios en la lista que todavía no guardaste. ¿Seguro que quieres salir?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DailyListProvider>();
     final dateLabel = DateFormat('dd/MM/yyyy').format(_selectedDate);
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('Lista del $dateLabel'),
-          backgroundColor: Colors.green.shade700,
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(text: 'VERDURAS'),
-              Tab(text: 'FRUTAS'),
+    return PopScope(
+      canPop: _allowPop || !provider.hasUnsavedChanges,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (await _confirmDiscard()) {
+          if (mounted) {
+            setState(() => _allowPop = true);
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text('Lista del $dateLabel'),
+            backgroundColor: Colors.green.shade700,
+            foregroundColor: Colors.white,
+            bottom: const TabBar(
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: [
+                Tab(text: 'VERDURAS'),
+                Tab(text: 'FRUTAS'),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: _pickDate,
+              ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.calendar_today),
-              onPressed: _pickDate,
-            ),
-          ],
-        ),
-        body: provider.loading && provider.currentList == null
-            ? const Center(child: CircularProgressIndicator())
-            : provider.error != null && provider.currentList == null
-                ? Center(child: Text('Error: ${provider.error}'))
-                : TabBarView(
-                    children: [
-                      _buildCategoryList(provider, 'verdura'),
-                      _buildCategoryList(provider, 'fruta'),
-                    ],
-                  ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: provider.loading ? null : _save,
-          icon: provider.loading
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.save),
-          label: Text(provider.loading ? 'Guardando...' : 'Guardar'),
-          backgroundColor: Colors.green.shade700,
-          foregroundColor: Colors.white,
+          body: provider.loading && provider.currentList == null
+              ? const Center(child: CircularProgressIndicator())
+              : provider.error != null && provider.currentList == null
+                  ? Center(child: Text('Error: ${provider.error}'))
+                  : TabBarView(
+                      children: [
+                        _buildCategoryList(provider, 'verdura'),
+                        _buildCategoryList(provider, 'fruta'),
+                      ],
+                    ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: provider.loading ? null : _save,
+            icon: provider.loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.save),
+            label: Text(provider.loading ? 'Guardando...' : 'Guardar'),
+            backgroundColor: Colors.green.shade700,
+            foregroundColor: Colors.white,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildCategoryList(DailyListProvider provider, String category) {
-    final products = provider.products.where((p) => p.category == category).toList();
+    final products =
+        provider.products.where((p) => p.category == category).toList();
     if (provider.currentList == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -128,7 +169,8 @@ class _DailyListScreenState extends State<DailyListScreen> {
       itemCount: products.length,
       itemBuilder: (context, index) {
         final product = products[index];
-        final item = provider.currentList!.items.firstWhere((i) => i.productId == product.id);
+        final item = provider.currentList!.items
+            .firstWhere((i) => i.productId == product.id);
         return ProductListItem(
           product: product,
           item: item,

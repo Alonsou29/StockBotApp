@@ -6,7 +6,7 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Fruteria El Trebol'), findsOneWidget);
+    expect(find.text('Al Dia'), findsOneWidget);
     expect(find.text('Hacer lista de hoy'), findsOneWidget);
     expect(find.text('Ver historial'), findsOneWidget);
   });
