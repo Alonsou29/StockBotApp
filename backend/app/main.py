@@ -1,20 +1,87 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, DBAPIError
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, AsyncSessionLocal
 from app.routers import products, daily_lists
 from app.seed import seed_products
-from app.database import AsyncSessionLocal
+
+logger = logging.getLogger(__name__)
+
+STARTUP_MAX_RETRIES = 10
+STARTUP_RETRY_DELAY = 1.0
+STARTUP_BACKOFF_FACTOR = 1.5
+
+
+def _is_connection_error(exc: Exception) -> bool:
+    if isinstance(exc, OperationalError):
+        return True
+    if isinstance(exc, DBAPIError) and getattr(exc, "connection_invalidated", False):
+        return True
+    return False
+
+
+async def _ensure_schema_with_retry() -> None:
+    """Crea las tablas reintentando si la base de datos no está disponible."""
+    for attempt in range(STARTUP_MAX_RETRIES):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Esquema de base de datos verificado.")
+            return
+        except Exception as exc:
+            if not _is_connection_error(exc):
+                raise
+            logger.warning(
+                "No se pudo conectar a la base de datos para crear tablas (intento %d/%d): %s",
+                attempt + 1,
+                STARTUP_MAX_RETRIES,
+                exc,
+            )
+            if attempt < STARTUP_MAX_RETRIES - 1:
+                await engine.dispose()
+                wait_seconds = STARTUP_RETRY_DELAY * (STARTUP_BACKOFF_FACTOR ** attempt)
+                logger.info("Reintentando en %.1f segundos...", wait_seconds)
+                await asyncio.sleep(wait_seconds)
+    logger.error("No se pudo conectar a la base de datos durante el inicio.")
+    raise
+
+
+async def _seed_products_with_retry() -> None:
+    """Siembra los productos reintentando si la BD no responde."""
+    for attempt in range(STARTUP_MAX_RETRIES):
+        try:
+            async with AsyncSessionLocal() as session:
+                await seed_products(session)
+            logger.info("Productos sembrados correctamente.")
+            return
+        except Exception as exc:
+            if not _is_connection_error(exc):
+                raise
+            logger.warning(
+                "No se pudo sembrar productos (intento %d/%d): %s",
+                attempt + 1,
+                STARTUP_MAX_RETRIES,
+                exc,
+            )
+            if attempt < STARTUP_MAX_RETRIES - 1:
+                await engine.dispose()
+                wait_seconds = STARTUP_RETRY_DELAY * (STARTUP_BACKOFF_FACTOR ** attempt)
+                logger.info("Reintentando seed en %.1f segundos...", wait_seconds)
+                await asyncio.sleep(wait_seconds)
+    logger.error("No se pudo sembrar productos durante el inicio.")
+    raise
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with AsyncSessionLocal() as session:
-        await seed_products(session)
+    await _ensure_schema_with_retry()
+    await _seed_products_with_retry()
     yield
 
 
@@ -44,4 +111,13 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception as exc:
+        logger.warning("Health check falló: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "error", "database": "disconnected", "detail": str(exc)},
+        )
