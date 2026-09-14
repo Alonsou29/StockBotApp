@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/daily_list_provider.dart';
+import 'providers/debt_provider.dart';
 import 'screens/splash_screen.dart';
 
 void main() {
@@ -12,8 +13,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => DailyListProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => DailyListProvider()),
+        ChangeNotifierProvider(create: (_) => DebtProvider()..init()),
+      ],
       child: MaterialApp(
         title: 'Al Dia',
         debugShowCheckedModeBanner: false,

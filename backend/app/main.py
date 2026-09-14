@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError, DBAPIError
 
 from app.config import settings
 from app.database import engine, Base, AsyncSessionLocal
-from app.routers import products, daily_lists
+from app.routers import products, daily_lists, odoo, debts
 from app.seed import seed_products
 
 logger = logging.getLogger(__name__)
@@ -102,6 +102,8 @@ app.add_middleware(
 
 app.include_router(products.router)
 app.include_router(daily_lists.router)
+app.include_router(odoo.router)
+app.include_router(debts.router)
 
 
 @app.get("/")

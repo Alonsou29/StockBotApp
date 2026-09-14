@@ -83,7 +83,22 @@ flutter run
 - Crear y editar lista del día con fecha.
 - Indicar "Hay" y "Traer" para cada producto.
 - Guardar historial de listas anteriores.
+- **Módulo de deudas de empleados**: empleados y productos desde Odoo (JSON-RPC), carga de productos con precio de venta, saldo acumulativo con cargos y abonos, multicede (2 empresas) y exportación de reportes en PDF o imagen.
 - Sin login ni autenticación (por ahora).
+
+## Configuración de Odoo
+
+El módulo de deudas consulta Odoo vía JSON-RPC. Agrega estas variables al `.env`:
+
+```
+ODOO_URL=https://tu-odoo.com
+ODOO_DB=nombre_base_odoo
+ODOO_USERNAME=tu_usuario
+ODOO_API_KEY=tu_clave_api
+ODOO_TIMEOUT=20
+```
+
+Para crear la API key: Ajustes → Usuarios → tu usuario → Preferencias → Seguridad de la cuenta → Claves API → Nueva.
 
 ## API Endpoints principales
 
@@ -95,3 +110,17 @@ flutter run
 - `POST /daily-lists/` - crear lista
 - `PUT /daily-lists/{id}` - actualizar lista
 - `DELETE /daily-lists/{id}` - eliminar lista
+
+## Módulo de deudas (Odoo)
+
+- `GET /odoo/health` - probar conexión con Odoo
+- `GET /odoo/companies` - listar cedes (empresas)
+- `GET /odoo/employees?company_id=&search=` - empleados desde Odoo
+- `GET /odoo/products?company_id=&search=` - productos con precio desde Odoo
+- `POST /debts/` - crear cargo (deuda) con items
+- `GET /debts/` - listar cargos
+- `GET /debts/{id}` / `DELETE /debts/{id}` - ver/eliminar cargo
+- `GET /debts/employees` - deudores con saldo (filtro por cede/búsqueda)
+- `GET /debts/employees/{id}` - cuenta del empleado (cargos + abonos + saldo)
+- `POST /debts/payments` - registrar abono
+- `GET /debts/payments` / `DELETE /debts/payments/{id}` - ver/eliminar abono

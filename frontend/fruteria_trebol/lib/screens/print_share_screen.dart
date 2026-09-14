@@ -1,20 +1,38 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/daily_list.dart';
 import '../constants/print_order.dart';
 
-class PrintShareScreen extends StatelessWidget {
+class PrintShareScreen extends StatefulWidget {
   final DailyList dailyList;
 
   const PrintShareScreen({super.key, required this.dailyList});
 
+  @override
+  State<PrintShareScreen> createState() => _PrintShareScreenState();
+}
+
+class _PrintShareScreenState extends State<PrintShareScreen> {
+  final GlobalKey _boundaryKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
+
+  DailyList get dailyList => widget.dailyList;
+
   String get formattedDate => DateFormat('dd/MM/yyyy').format(dailyList.listDate);
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   List<DailyListItem> get _verduras {
     final items = dailyList.items.where((i) => i.product?.category == 'verdura').toList();
@@ -104,14 +122,41 @@ class PrintShareScreen extends StatelessWidget {
     await Share.share(_buildText(), subject: 'Lista El Trebol $formattedDate');
   }
 
-  Future<void> _sendWhatsApp() async {
-    final text = Uri.encodeComponent(_buildText());
-    final url = Uri.parse('whatsapp://send?text=$text');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      final webUrl = Uri.parse('https://wa.me/?text=$text');
-      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+  Future<void> _sendWhatsApp(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    try {
+      final boundary = _boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw StateError('La vista previa de la imagen no está disponible');
+      }
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData!.buffer.asUint8List();
+
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            pngBytes,
+            mimeType: 'image/png',
+            name: 'lista_el_trebol_$formattedDate.png',
+          ),
+        ],
+        subject: 'Lista El Trebol $formattedDate',
+        sharePositionOrigin: origin,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar la imagen: $e')),
+        );
+      }
     }
   }
 
@@ -124,7 +169,7 @@ class PrintShareScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _print(BuildContext context) async {
+  Future<Uint8List> _buildPdf() async {
     final pdf = pw.Document(compress: true);
 
     pdf.addPage(
@@ -153,8 +198,13 @@ class PrintShareScreen extends StatelessWidget {
       ),
     );
 
+    return pdf.save();
+  }
+
+  Future<void> _print(BuildContext context) async {
+    final bytes = await _buildPdf();
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
+      onLayout: (PdfPageFormat format) async => bytes,
       name: 'lista_el_trebol_$formattedDate.pdf',
     );
   }
@@ -216,6 +266,88 @@ class PrintShareScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildSharePreview() {
+    const headerStyle = TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black);
+    const cellStyle = TextStyle(fontSize: 11, color: Colors.black);
+
+    Widget cell(String text,
+        {TextStyle style = cellStyle, TextAlign align = TextAlign.left}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Text(text, style: style, textAlign: align),
+      );
+    }
+
+    final rows = <TableRow>[
+      TableRow(
+        decoration: BoxDecoration(color: Colors.green.shade100),
+        children: [
+          cell('VERDURA', style: headerStyle),
+          cell('HAY', style: headerStyle, align: TextAlign.center),
+          cell('TRAER', style: headerStyle, align: TextAlign.center),
+          cell('FRUTAS', style: headerStyle),
+          cell('HAY', style: headerStyle, align: TextAlign.center),
+          cell('TRAER', style: headerStyle, align: TextAlign.center),
+        ],
+      ),
+    ];
+
+    final maxRows = _verduras.length > _frutas.length ? _verduras.length : _frutas.length;
+    for (var i = 0; i < maxRows; i++) {
+      final v = i < _verduras.length ? _verduras[i] : null;
+      final f = i < _frutas.length ? _frutas[i] : null;
+      rows.add(
+        TableRow(
+          children: [
+            cell(v != null ? displayProductName(v.product?.name ?? 'Producto ${v.productId}') : ''),
+            cell(v != null ? _formatHay(v.hay) : '', align: TextAlign.center),
+            cell(v != null ? _formatTraer(v) : '', align: TextAlign.center),
+            cell(f != null ? displayProductName(f.product?.name ?? 'Producto ${f.productId}') : ''),
+            cell(f != null ? _formatHay(f.hay) : '', align: TextAlign.center),
+            cell(f != null ? _formatTraer(f) : '', align: TextAlign.center),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Frutería El Trébol',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          Text(
+            'Lista del día: $formattedDate',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Colors.black),
+          ),
+          if (dailyList.notes != null && dailyList.notes!.isNotEmpty)
+            Text('Notas: ${dailyList.notes}', style: const TextStyle(fontSize: 11, color: Colors.black)),
+          const SizedBox(height: 8),
+          Table(
+            border: TableBorder.all(width: 0.5, color: Colors.black),
+            columnWidths: const {
+              0: FlexColumnWidth(3),
+              1: FlexColumnWidth(1),
+              2: FlexColumnWidth(1),
+              3: FlexColumnWidth(3),
+              4: FlexColumnWidth(1),
+              5: FlexColumnWidth(1),
+            },
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: rows,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -231,9 +363,27 @@ class PrintShareScreen extends StatelessWidget {
           children: [
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Text(
+                      'Vista previa de la imagen:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.topLeft,
+                      child: RepaintBoundary(
+                        key: _boundaryKey,
+                        child: SizedBox(
+                          width: 680,
+                          child: _buildSharePreview(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     _buildSection('VERDURAS', _verduras),
                     const SizedBox(height: 24),
                     _buildSection('FRUTAS', _frutas),
@@ -263,9 +413,9 @@ class PrintShareScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: _sendWhatsApp,
+              onPressed: () => _sendWhatsApp(context),
               icon: const Icon(Icons.message),
-              label: const Text('Enviar por WhatsApp'),
+              label: const Text('Enviar imagen por WhatsApp'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),

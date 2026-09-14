@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'daily_list_screen.dart';
+import 'debt_home_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
@@ -62,6 +63,20 @@ class HomeScreen extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: Colors.green.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DebtHomeScreen()),
+              ),
+              icon: const Icon(Icons.account_balance_wallet),
+              label: const Text('Deudas de empleados'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.red.shade600,
                 foregroundColor: Colors.white,
               ),
             ),
