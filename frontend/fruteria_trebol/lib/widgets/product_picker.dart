@@ -137,83 +137,94 @@ class _ProductPickerDialogState extends State<ProductPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Buscar producto'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _searchController,
-              onSubmitted: (_) => _search(),
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Buscar en Odoo',
-                border: const OutlineInputBorder(),
-                isDense: true,
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: _search,
+    final size = MediaQuery.sizeOf(context);
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: size.width * 0.9,
+          maxHeight: size.height * 0.85,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Buscar producto',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                onSubmitted: (_) => _search(),
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Buscar en Odoo',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _search,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            if (_searching)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_results.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: Text('Sin resultados')),
-              )
-            else ...[
-              SizedBox(
-                height: 200,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _visible.length,
-                  itemBuilder: (context, index) {
-                    final product = _visible[index];
-                    return ListTile(
-                      dense: true,
-                      title: Text(product.name),
-                      subtitle: Text(formatMoney(product.listPrice)),
-                      trailing: const Icon(Icons.add_circle, color: Colors.green),
-                      onTap: () => _pick(product),
-                    );
-                  },
+              const SizedBox(height: 12),
+              if (_searching)
+                const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_results.isEmpty)
+                const Expanded(
+                  child: Center(child: Text('Sin resultados')),
+                )
+              else ...[
+                Expanded(
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: _visible.length,
+                    itemBuilder: (context, index) {
+                      final product = _visible[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(product.name),
+                        subtitle: Text(formatMoney(product.listPrice)),
+                        trailing: const Icon(Icons.add_circle, color: Colors.green),
+                        onTap: () => _pick(product),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: _page > 0 ? () => _goToPage(_page - 1) : null,
-                  ),
-                  Text('Página ${_page + 1} de $_totalPages'),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: _page < _totalPages - 1
-                        ? () => _goToPage(_page + 1)
-                        : null,
-                  ),
-                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _page > 0 ? () => _goToPage(_page - 1) : null,
+                    ),
+                    Text('Página ${_page + 1} de $_totalPages'),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _page < _totalPages - 1
+                          ? () => _goToPage(_page + 1)
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
               ),
             ],
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-      ],
     );
   }
 }
