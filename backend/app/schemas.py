@@ -134,12 +134,16 @@ class DebtResponse(BaseModel):
     items: List[DebtItemResponse] = []
 
 
-class DebtItemUpdate(BaseModel):
-    odoo_product_id: int
-    product_name: str
+class DebtItemAdd(BaseModel):
+    items: List[DebtItemCreate]
+
+
+class DebtItemUpdateExisting(BaseModel):
+    odoo_product_id: Optional[int] = None
+    product_name: Optional[str] = None
     product_code: Optional[str] = None
-    unit_price: Decimal
-    quantity: Decimal = Decimal("1")
+    unit_price: Optional[Decimal] = None
+    quantity: Optional[Decimal] = None
 
 
 class DebtUpdate(BaseModel):

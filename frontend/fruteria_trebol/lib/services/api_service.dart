@@ -249,4 +249,39 @@ class ApiService {
     }
     throw Exception('Error registrando abono: ${response.statusCode} ${response.body}');
   }
+
+  static Future<Debt> addDebtItems(int debtId, List<DebtItem> items) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/debts/$debtId/items'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'items': items.map((i) => i.toCreateJson()).toList()}),
+    );
+    if (response.statusCode == 200) {
+      return Debt.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Error agregando productos: ${response.statusCode} ${response.body}');
+  }
+
+  static Future<Debt> updateDebtItem(
+    int itemId, {
+    required double unitPrice,
+    required double quantity,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/debts/items/$itemId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'unit_price': unitPrice, 'quantity': quantity}),
+    );
+    if (response.statusCode == 200) {
+      return Debt.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Error actualizando producto: ${response.statusCode} ${response.body}');
+  }
+
+  static Future<void> deleteDebtItem(int itemId) async {
+    final response = await http.delete(Uri.parse('$baseUrl/debts/items/$itemId'));
+    if (response.statusCode != 204) {
+      throw Exception('Error eliminando producto: ${response.statusCode} ${response.body}');
+    }
+  }
 }

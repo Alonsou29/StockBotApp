@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../models/debt.dart';
 import '../models/employee.dart';
-import '../models/odoo_product.dart';
 import '../providers/debt_provider.dart';
+import '../utils/format.dart';
+import '../widgets/product_picker.dart';
 import 'debt_report_screen.dart';
 
 class NewDebtScreen extends StatefulWidget {
@@ -23,19 +24,15 @@ class _NewDebtScreenState extends State<NewDebtScreen> {
   final DateTime _date = DateTime.now();  final TextEditingController _notesController = TextEditingController();
 
   final TextEditingController _employeeSearch = TextEditingController();
-  final TextEditingController _productSearch = TextEditingController();
 
   List<Employee> _employeeResults = [];
-  List<OdooProduct> _productResults = [];
   bool _searchingEmployees = false;
-  bool _searchingProducts = false;
   bool _saving = false;
 
   @override
   void dispose() {
     _notesController.dispose();
     _employeeSearch.dispose();
-    _productSearch.dispose();
     super.dispose();
   }
 
@@ -58,21 +55,15 @@ class _NewDebtScreenState extends State<NewDebtScreen> {
     }
   }
 
-  Future<void> _searchProducts(String query) async {
-    if (query.trim().length < 2) return;
-    setState(() => _searchingProducts = true);
-    try {
-      final results = await context.read<DebtProvider>().searchProducts(query.trim());
-      if (mounted) setState(() => _productResults = results);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error buscando productos: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _searchingProducts = false);
-    }
+  Future<void> _pickProduct() async {
+    final item = await showDialog<DebtItem>(
+      context: context,
+      builder: (_) => ProductPickerDialog(
+        companyId: context.read<DebtProvider>().selectedCompany?.id,
+      ),
+    );
+    if (item == null || !mounted) return;
+    setState(() => _items.add(item));
   }
 
   void _selectEmployee(Employee employee) {
@@ -81,63 +72,6 @@ class _NewDebtScreenState extends State<NewDebtScreen> {
       _employeeResults = [];
       _employeeSearch.clear();
     });
-  }
-
-  Future<void> _addProduct(OdooProduct product) async {
-    final quantity = await _askQuantity(product);
-    if (quantity == null || quantity <= 0) return;
-    setState(() {
-      _items.add(DebtItem(
-        odooProductId: product.id,
-        productName: product.name,
-        productCode: product.code,
-        unitPrice: product.listPrice,
-        quantity: quantity,
-        subtotal: double.parse((product.listPrice * quantity).toStringAsFixed(2)),
-      ));
-    });
-  }
-
-  Future<double?> _askQuantity(OdooProduct product) async {
-    final controller = TextEditingController(text: '1');
-    final result = await showDialog<double>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(product.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Precio: ${_money(product.listPrice)}'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Cantidad',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              final value = double.tryParse(controller.text.replaceAll(',', '.'));
-              Navigator.pop(context, value);
-            },
-            child: const Text('Agregar'),
-          ),
-        ],
-      ),
-    );
-    return result;
   }
 
   Future<void> _editItemQuantity(int index) async {
@@ -357,33 +291,21 @@ class _NewDebtScreenState extends State<NewDebtScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
-          controller: _productSearch,
-          onSubmitted: _searchProducts,
-          decoration: InputDecoration(
-            labelText: 'Buscar producto en Odoo',
-            border: const OutlineInputBorder(),
-            isDense: true,
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () => _searchProducts(_productSearch.text),
-            ),
+        OutlinedButton.icon(
+          onPressed: _pickProduct,
+          icon: const Icon(Icons.add_circle, color: Colors.green),
+          label: const Text('Buscar y agregar producto'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.green,
+            minimumSize: const Size.fromHeight(48),
           ),
         ),
-        if (_searchingProducts)
+        const SizedBox(height: 4),
+        if (_items.isEmpty)
           const Padding(
             padding: EdgeInsets.all(12),
-            child: Center(child: CircularProgressIndicator()),
+            child: Text('Aún no has agregado productos.'),
           ),
-        ..._productResults.map(
-          (p) => ListTile(
-            dense: true,
-            title: Text(p.name),
-            subtitle: Text(_money(p.listPrice)),
-            trailing: const Icon(Icons.add_circle, color: Colors.green),
-            onTap: () => _addProduct(p),
-          ),
-        ),
         if (_items.isNotEmpty) ...[
           const Divider(),
           const Text('Productos agregados',
@@ -484,10 +406,6 @@ class _NewDebtScreenState extends State<NewDebtScreen> {
   }
 }
 
-String _money(double value) =>
-    NumberFormat.currency(locale: 'es', symbol: 'Bs ', decimalDigits: 2).format(value);
+String _money(double value) => formatMoney(value);
 
-String _qty(double value) {
-  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-  return value.toString();
-}
+String _qty(double value) => formatQty(value);

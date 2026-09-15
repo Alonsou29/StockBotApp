@@ -104,3 +104,39 @@ async def delete_debt(debt_id: int, db: AsyncSession = Depends(get_db)):
     if not deleted:
         raise HTTPException(status_code=404, detail="Deuda no encontrada")
     return None
+
+
+@router.post("/{debt_id}/items", response_model=schemas.DebtResponse)
+async def add_debt_items(
+    debt_id: int, data: schemas.DebtItemAdd, db: AsyncSession = Depends(get_db)
+):
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Debes agregar al menos un item")
+    debt = await crud.add_debt_items(db, debt_id, data.items)
+    if not debt:
+        raise HTTPException(status_code=404, detail="Deuda no encontrada")
+    return debt
+
+
+@router.put("/items/{item_id}", response_model=schemas.DebtResponse)
+async def update_debt_item(
+    item_id: int,
+    data: schemas.DebtItemUpdateExisting,
+    db: AsyncSession = Depends(get_db),
+):
+    debt = await crud.update_debt_item(db, item_id, data)
+    if not debt:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    return debt
+
+
+@router.delete("/items/{item_id}", status_code=204)
+async def delete_debt_item(item_id: int, db: AsyncSession = Depends(get_db)):
+    debt = await crud.delete_debt_item(db, item_id)
+    if not debt:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    if any(i.id == item_id for i in debt.items):
+        raise HTTPException(
+            status_code=400, detail="La deuda debe tener al menos un item"
+        )
+    return None

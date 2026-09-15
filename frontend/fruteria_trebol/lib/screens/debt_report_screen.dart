@@ -10,6 +10,7 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/debt.dart';
+import '../utils/format.dart';
 
 class DebtReportScreen extends StatefulWidget {
   final String companyName;
@@ -448,12 +449,11 @@ class _DebtReportScreenState extends State<DebtReportScreen> {
 }
 
 String _money(double value) {
-  return NumberFormat.currency(locale: 'es', symbol: 'Bs ', decimalDigits: 2).format(value);
+  return formatMoney(value);
 }
 
 String _qty(double value) {
-  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-  return value.toString();
+  return formatQty(value);
 }
 
 String _dateStr(DateTime date) => DateFormat('dd/MM/yyyy').format(date);

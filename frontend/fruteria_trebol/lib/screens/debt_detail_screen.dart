@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../models/debt.dart';
 import '../providers/debt_provider.dart';
 import '../services/api_service.dart';
+import '../utils/format.dart';
+import '../widgets/product_picker.dart';
 
 class DebtDetailScreen extends StatefulWidget {
   final DebtEmployee employee;
@@ -120,6 +122,94 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
     }
   }
 
+  Future<void> _addProductsToDebt(Debt debt) async {
+    final item = await showDialog<DebtItem>(
+      context: context,
+      builder: (_) => ProductPickerDialog(
+        companyId: context.read<DebtProvider>().selectedCompany?.id,
+      ),
+    );
+    if (item == null || !mounted) return;
+    try {
+      await ApiService.addDebtItems(debt.id!, [item]);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Producto agregado a la deuda')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _editItem(DebtItem item) async {
+    final result = await showDialog<_ItemEditResult>(
+      context: context,
+      builder: (_) => _ItemEditDialog(item: item),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await ApiService.updateDebtItem(
+        item.id!,
+        unitPrice: result.unitPrice,
+        quantity: result.quantity,
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Producto actualizado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteItem(DebtItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar producto?'),
+        content: Text('${item.productName} se quitará de la deuda.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ApiService.deleteDebtItem(item.id!);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Producto eliminado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -217,26 +307,138 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
       child: ExpansionTile(
         leading: const Icon(Icons.shopping_basket_outlined, color: Colors.green),
         title: Text(debt.debtDate != null ? DateFormat('dd/MM/yyyy').format(debt.debtDate!) : ''),
-        subtitle: Text('${debt.items.length} producto(s)${debt.notes != null ? ' • ${debt.notes}' : ''}'),
+        subtitle: Text(
+          '${debt.items.length} producto(s) • ${_money(debt.total)}${debt.notes != null ? ' • ${debt.notes}' : ''}',
+        ),
         trailing: Text(_money(debt.total),
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-        children: debt.items
-            .map((item) => ListTile(
-                  dense: true,
-                  title: Text(item.productName),
-                  subtitle: Text('${_qty(item.quantity)} x ${_money(item.unitPrice)}'),
-                  trailing: Text(_money(item.subtotal)),
-                ))
-            .toList(),
+        children: [
+          ...debt.items.map((item) => ListTile(
+                dense: true,
+                title: Text(item.productName),
+                subtitle: Text('${_qty(item.quantity)} x ${_money(item.unitPrice)}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_money(item.subtotal),
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.edit, size: 18),
+                      tooltip: 'Editar',
+                      onPressed: item.id != null ? () => _editItem(item) : null,
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                      tooltip: 'Eliminar',
+                      onPressed: item.id != null ? () => _deleteItem(item) : null,
+                    ),
+                  ],
+                ),
+              )),
+          const Divider(height: 1),
+          ListTile(
+            dense: true,
+            leading: const Icon(Icons.add_circle_outline, color: Colors.green),
+            title: const Text('Agregar producto a esta deuda',
+                style: TextStyle(color: Colors.green)),
+            onTap: () => _addProductsToDebt(debt),
+          ),
+        ],
       ),
     );
   }
 }
 
-String _money(double value) =>
-    NumberFormat.currency(locale: 'es', symbol: 'Bs ', decimalDigits: 2).format(value);
-
-String _qty(double value) {
-  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-  return value.toString();
+class _ItemEditResult {
+  final double unitPrice;
+  final double quantity;
+  _ItemEditResult(this.unitPrice, this.quantity);
 }
+
+class _ItemEditDialog extends StatefulWidget {
+  final DebtItem item;
+  const _ItemEditDialog({required this.item});
+
+  @override
+  State<_ItemEditDialog> createState() => _ItemEditDialogState();
+}
+
+class _ItemEditDialogState extends State<_ItemEditDialog> {
+  late final TextEditingController _priceController;
+  late final TextEditingController _qtyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _priceController = TextEditingController(
+        text: widget.item.unitPrice.toStringAsFixed(2));
+    _qtyController = TextEditingController(text: formatQty(widget.item.quantity));
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.item.productName),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _priceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: r'Precio ($)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _qtyController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Cantidad',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () {
+            final price =
+                double.tryParse(_priceController.text.replaceAll(',', '.'));
+            final qty =
+                double.tryParse(_qtyController.text.replaceAll(',', '.'));
+            if (price == null || price < 0 || qty == null || qty <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Valores inválidos')),
+              );
+              return;
+            }
+            Navigator.pop(context, _ItemEditResult(price, qty));
+          },
+          child: const Text('Guardar'),
+        ),
+      ],
+    );
+  }
+}
+
+String _money(double value) => formatMoney(value);
+
+String _qty(double value) => formatQty(value);

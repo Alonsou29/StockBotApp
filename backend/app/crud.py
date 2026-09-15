@@ -224,6 +224,79 @@ async def delete_debt(session: AsyncSession, debt_id: int):
     return True
 
 
+async def _recompute_debt_total(session: AsyncSession, db_debt: Debt) -> None:
+    total = sum((i.subtotal or 0) for i in db_debt.items)
+    db_debt.total = Decimal(total).quantize(Decimal("0.01"))
+    await session.flush()
+
+
+async def update_debt_item(
+    session: AsyncSession, item_id: int, data: schemas.DebtItemUpdateExisting
+) -> Debt | None:
+    db_item = (
+        await session.execute(select(DebtItem).where(DebtItem.id == item_id))
+    ).scalar_one_or_none()
+    if not db_item:
+        return None
+    if data.odoo_product_id is not None:
+        db_item.odoo_product_id = data.odoo_product_id
+    if data.product_name is not None:
+        db_item.product_name = data.product_name
+    if data.product_code is not None:
+        db_item.product_code = data.product_code
+    if data.unit_price is not None:
+        db_item.unit_price = data.unit_price
+    if data.quantity is not None:
+        db_item.quantity = data.quantity
+    db_item.subtotal = (db_item.quantity * db_item.unit_price).quantize(Decimal("0.01"))
+    db_debt = (
+        await session.execute(
+            select(Debt)
+            .where(Debt.id == db_item.debt_id)
+            .options(selectinload(Debt.items))
+        )
+    ).scalar_one_or_none()
+    if db_debt is None:
+        return None
+    await _recompute_debt_total(session, db_debt)
+    await session.commit()
+    return await get_debt(session, db_debt.id)
+
+
+async def delete_debt_item(session: AsyncSession, item_id: int) -> Debt | None:
+    db_item = (
+        await session.execute(
+            select(DebtItem)
+            .where(DebtItem.id == item_id)
+            .options(selectinload(DebtItem.debt).selectinload(Debt.items))
+        )
+    ).scalar_one_or_none()
+    if not db_item:
+        return None
+    db_debt = db_item.debt
+    if len(db_debt.items) <= 1:
+        return db_debt
+    await session.delete(db_item)
+    await session.flush()
+    await _recompute_debt_total(session, db_debt)
+    await session.commit()
+    return await get_debt(session, db_debt.id)
+
+
+async def add_debt_items(
+    session: AsyncSession, debt_id: int, items: list[schemas.DebtItemCreate]
+) -> Debt | None:
+    db_debt = await get_debt(session, debt_id)
+    if not db_debt:
+        return None
+    await _compute_debt_items(session, db_debt, items)
+    await session.flush()
+    fresh = await get_debt(session, debt_id)
+    await _recompute_debt_total(session, fresh)
+    await session.commit()
+    return await get_debt(session, debt_id)
+
+
 async def _employee_totals(session: AsyncSession, employee_ids: list[int]) -> dict[int, dict]:
     result = {}
     if not employee_ids:

@@ -18,9 +18,9 @@ class Employee {
   factory Employee.fromJson(Map<String, dynamic> json) {
     return Employee(
       odooId: json['id'] as int,
-      name: json['name'] as String? ?? '',
-      identification: json['identification_id'] as String?,
-      jobTitle: json['job_title'] as String?,
+      name: odooString(json['name']) ?? '',
+      identification: odooString(json['identification_id']),
+      jobTitle: odooString(json['job_title']),
       companyId: parseOdooId(json['company_id']),
       active: json['active'] as bool? ?? true,
     );
@@ -45,4 +45,9 @@ int? parseOdooId(dynamic value) {
     if (first is int) return first;
   }
   return null;
+}
+
+String? odooString(dynamic value) {
+  if (value == null || value is bool) return null;
+  return value.toString();
 }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/company.dart';
 import '../models/debt.dart';
 import '../providers/debt_provider.dart';
+import '../utils/format.dart';
 import 'debt_detail_screen.dart';
 import 'debt_report_screen.dart';
 import 'new_debt_screen.dart';
@@ -283,5 +283,4 @@ class _DebtHomeScreenState extends State<DebtHomeScreen> {
   }
 }
 
-String _money(double value) =>
-    NumberFormat.currency(locale: 'es', symbol: 'Bs ', decimalDigits: 2).format(value);
+String _money(double value) => formatMoney(value);

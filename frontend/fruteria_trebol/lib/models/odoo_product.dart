@@ -20,8 +20,8 @@ class OdooProduct {
   factory OdooProduct.fromJson(Map<String, dynamic> json) {
     return OdooProduct(
       id: json['id'] as int,
-      name: json['name'] as String? ?? '',
-      code: json['default_code'] as String?,
+      name: odooString(json['name']) ?? '',
+      code: odooString(json['default_code']),
       listPrice: (json['list_price'] as num?)?.toDouble() ?? 0,
       categoryId: parseOdooId(json['categ_id']),
       companyId: parseOdooId(json['company_id']),
