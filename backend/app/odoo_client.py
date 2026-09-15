@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from decimal import Decimal
 from typing import Any, Optional
 
 import httpx
@@ -10,6 +11,8 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 300  # 5 minutos
+
+_STOCK_LOCATIONS = {1: 5, 2: 30}  # company_id -> ubicacion "Existencias"
 
 
 class OdooError(Exception):
@@ -156,6 +159,71 @@ class OdooClient:
             },
         )
         return self._store(key, records or [])
+
+    def _stock_location(self, company_id: Optional[int]) -> int:
+        return _STOCK_LOCATIONS.get(company_id or 1, 5)
+
+    async def adjust_stock(self, company_id: Optional[int], items: list[dict[str, Any]]) -> dict[int, float]:
+        """Ajusta el stock on-hand en Odoo.
+
+        - items: [{product_id, delta}]
+        - delta negativo descuenta stock, positivo lo devuelve.
+        - Si falla cualquier ajuste, lanza OdooError (aborta la operacion).
+        """
+        if not self._configured:
+            raise OdooError("Configuración de Odoo incompleta en el .env")
+        location_id = self._stock_location(company_id)
+        uid = await self.authenticate()
+        results: dict[int, float] = {}
+        for item in items:
+            product_id = int(item["product_id"])
+            delta = Decimal(str(item["delta"]))
+            if delta == 0:
+                continue
+            try:
+                quant_ids = await self.execute_kw(
+                    "stock.quant", "search", [[["product_id", "=", product_id], ["location_id", "=", location_id]]]
+                )
+                if quant_ids:
+                    quant_data = await self.execute_kw(
+                        "stock.quant", "read", [quant_ids[0], ["quantity"]]
+                    )
+                    current = Decimal(str(quant_data[0].get("quantity") or 0))
+                    quant_id = int(quant_ids[0])
+                else:
+                    current = Decimal("0")
+                    created = await self.execute_kw(
+                        "stock.quant",
+                        "create",
+                        [[
+                            {
+                                "product_id": product_id,
+                                "location_id": location_id,
+                                "inventory_quantity": float(delta),
+                                "inventory_quantity_set": True,
+                            }
+                        ]],
+                    )
+                    quant_id = int(created[0])
+                target = (current + delta).quantize(Decimal("0.001"))
+                await self.execute_kw(
+                    "stock.quant",
+                    "write",
+                    [[quant_id], {"inventory_quantity": float(target), "inventory_quantity_set": True}],
+                )
+                await self.execute_kw(
+                    "stock.quant",
+                    "action_apply_inventory",
+                    [[quant_id]],
+                    {"context": {}},
+                )
+                results[product_id] = float(target)
+            except OdooError:
+                raise
+            except Exception as exc:
+                raise OdooError(f"No se pudo ajustar stock del producto {product_id}: {exc}")
+        logger.info("Ajuste de stock en Odoo (loc %s): %s", location_id, results)
+        return results
 
 
 odoo_client = OdooClient()

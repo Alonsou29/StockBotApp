@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 from decimal import Decimal
 from typing import Optional
 from sqlalchemy import select, desc, func
@@ -7,6 +8,9 @@ from sqlalchemy.orm import selectinload
 
 from app.models import Product, DailyList, DailyListItem, DebtEmployee, Debt, DebtItem, DebtPayment
 from app import schemas
+from app.odoo_client import odoo_client
+
+logger = logging.getLogger(__name__)
 
 
 # Products
@@ -164,20 +168,47 @@ async def _compute_debt_items(session: AsyncSession, db_debt: Debt, items: list[
     db_debt.total = total.quantize(Decimal("0.01"))
 
 
+def _stock_deltas(items: list[schemas.DebtItemCreate], sign: int) -> list[dict]:
+    deltas = []
+    for item in items:
+        if item.quantity:
+            deltas.append({"product_id": item.odoo_product_id, "delta": sign * item.quantity})
+    return deltas
+
+
+async def _revert_stock(company_id: int, deltas: list[dict]) -> None:
+    if not deltas:
+        return
+    try:
+        await odoo_client.adjust_stock(
+            company_id,
+            [{"product_id": d["product_id"], "delta": -d["delta"]} for d in deltas],
+        )
+    except Exception:
+        logger.exception("No se pudo revertir el stock en Odoo tras un error local")
+
+
 async def create_debt(session: AsyncSession, data: schemas.DebtCreate) -> Debt:
     employee = await _upsert_debt_employee(session, data)
-    db_debt = Debt(
-        employee_id=employee.id,
-        company_id=data.company_id,
-        debt_date=data.debt_date,
-        notes=data.notes,
-        total=Decimal("0"),
-    )
-    session.add(db_debt)
-    await session.flush()
-    await _compute_debt_items(session, db_debt, data.items)
-    await session.commit()
-    return await get_debt(session, db_debt.id)
+    deltas = _stock_deltas(data.items, -1)
+    if deltas:
+        await odoo_client.adjust_stock(data.company_id, deltas)
+    try:
+        db_debt = Debt(
+            employee_id=employee.id,
+            company_id=data.company_id,
+            debt_date=data.debt_date,
+            notes=data.notes,
+            total=Decimal("0"),
+        )
+        session.add(db_debt)
+        await session.flush()
+        await _compute_debt_items(session, db_debt, data.items)
+        await session.commit()
+        return await get_debt(session, db_debt.id)
+    except Exception:
+        await _revert_stock(data.company_id, deltas)
+        raise
 
 
 async def get_debt(session: AsyncSession, debt_id: int):
@@ -219,9 +250,17 @@ async def delete_debt(session: AsyncSession, debt_id: int):
     db_debt = await get_debt(session, debt_id)
     if not db_debt:
         return False
-    await session.delete(db_debt)
-    await session.commit()
-    return True
+    company_id = db_debt.company_id
+    deltas = [{"product_id": i.odoo_product_id, "delta": i.quantity} for i in db_debt.items if i.quantity]
+    if deltas:
+        await odoo_client.adjust_stock(company_id, deltas)
+    try:
+        await session.delete(db_debt)
+        await session.commit()
+        return True
+    except Exception:
+        await _revert_stock(company_id, deltas)
+        raise
 
 
 async def _recompute_debt_total(session: AsyncSession, db_debt: Debt) -> None:
@@ -238,6 +277,17 @@ async def update_debt_item(
     ).scalar_one_or_none()
     if not db_item:
         return None
+    db_debt = (
+        await session.execute(
+            select(Debt)
+            .where(Debt.id == db_item.debt_id)
+            .options(selectinload(Debt.items))
+        )
+    ).scalar_one_or_none()
+    if db_debt is None:
+        return None
+
+    old_qty = Decimal(db_item.quantity)
     if data.odoo_product_id is not None:
         db_item.odoo_product_id = data.odoo_product_id
     if data.product_name is not None:
@@ -249,18 +299,21 @@ async def update_debt_item(
     if data.quantity is not None:
         db_item.quantity = data.quantity
     db_item.subtotal = (db_item.quantity * db_item.unit_price).quantize(Decimal("0.01"))
-    db_debt = (
-        await session.execute(
-            select(Debt)
-            .where(Debt.id == db_item.debt_id)
-            .options(selectinload(Debt.items))
-        )
-    ).scalar_one_or_none()
-    if db_debt is None:
-        return None
-    await _recompute_debt_total(session, db_debt)
-    await session.commit()
-    return await get_debt(session, db_debt.id)
+
+    deltas = []
+    if data.quantity is not None:
+        new_qty = Decimal(data.quantity)
+        if new_qty != old_qty:
+            deltas.append({"product_id": db_item.odoo_product_id, "delta": old_qty - new_qty})
+    if deltas:
+        await odoo_client.adjust_stock(db_debt.company_id, deltas)
+    try:
+        await _recompute_debt_total(session, db_debt)
+        await session.commit()
+        return await get_debt(session, db_debt.id)
+    except Exception:
+        await _revert_stock(db_debt.company_id, deltas)
+        raise
 
 
 async def delete_debt_item(session: AsyncSession, item_id: int) -> Debt | None:
@@ -276,11 +329,19 @@ async def delete_debt_item(session: AsyncSession, item_id: int) -> Debt | None:
     db_debt = db_item.debt
     if len(db_debt.items) <= 1:
         return db_debt
-    await session.delete(db_item)
-    await session.flush()
-    await _recompute_debt_total(session, db_debt)
-    await session.commit()
-    return await get_debt(session, db_debt.id)
+    company_id = db_debt.company_id
+    deltas = [{"product_id": db_item.odoo_product_id, "delta": db_item.quantity}] if db_item.quantity else []
+    if deltas:
+        await odoo_client.adjust_stock(company_id, deltas)
+    try:
+        await session.delete(db_item)
+        await session.flush()
+        await _recompute_debt_total(session, db_debt)
+        await session.commit()
+        return await get_debt(session, db_debt.id)
+    except Exception:
+        await _revert_stock(company_id, deltas)
+        raise
 
 
 async def add_debt_items(
@@ -289,12 +350,19 @@ async def add_debt_items(
     db_debt = await get_debt(session, debt_id)
     if not db_debt:
         return None
-    await _compute_debt_items(session, db_debt, items)
-    await session.flush()
-    fresh = await get_debt(session, debt_id)
-    await _recompute_debt_total(session, fresh)
-    await session.commit()
-    return await get_debt(session, debt_id)
+    deltas = _stock_deltas(items, -1)
+    if deltas:
+        await odoo_client.adjust_stock(db_debt.company_id, deltas)
+    try:
+        await _compute_debt_items(session, db_debt, items)
+        await session.flush()
+        fresh = await get_debt(session, debt_id)
+        await _recompute_debt_total(session, fresh)
+        await session.commit()
+        return await get_debt(session, debt_id)
+    except Exception:
+        await _revert_stock(db_debt.company_id, deltas)
+        raise
 
 
 async def _employee_totals(session: AsyncSession, employee_ids: list[int]) -> dict[int, dict]:

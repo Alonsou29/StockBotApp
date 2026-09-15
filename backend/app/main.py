@@ -1,13 +1,15 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, DBAPIError
 
 from app.config import settings
 from app.database import engine, Base, AsyncSessionLocal
+from app.odoo_client import OdooError
 from app.routers import products, daily_lists, odoo, debts
 from app.seed import seed_products
 
@@ -104,6 +106,14 @@ app.include_router(products.router)
 app.include_router(daily_lists.router)
 app.include_router(odoo.router)
 app.include_router(debts.router)
+
+
+@app.exception_handler(OdooError)
+async def odoo_error_handler(request: Request, exc: OdooError):
+    return JSONResponse(
+        status_code=503,
+        content={"detail": f"Odoo no disponible: {exc}"},
+    )
 
 
 @app.get("/")
