@@ -149,7 +149,7 @@ class DebtItemUpdateExisting(BaseModel):
 class DebtUpdate(BaseModel):
     debt_date: Optional[date] = None
     notes: Optional[str] = None
-    items: Optional[List[DebtItemUpdate]] = None
+    items: Optional[List[DebtItemUpdateExisting]] = None
 
 
 class DebtPaymentCreate(BaseModel):
