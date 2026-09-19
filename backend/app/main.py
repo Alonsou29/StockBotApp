@@ -110,6 +110,7 @@ app.include_router(debts.router)
 
 @app.exception_handler(OdooError)
 async def odoo_error_handler(request: Request, exc: OdooError):
+    logger.exception("Error de Odoo en %s %s: %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=503,
         content={"detail": f"Odoo no disponible: {exc}"},
